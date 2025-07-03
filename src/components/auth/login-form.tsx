@@ -37,7 +37,7 @@ export function LoginForm() {
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (email === 'admin' && password === 'uUmope5Z') {
+        if (email === 'admin@admin' && password === 'uUmope5Z') {
             sessionStorage.setItem('isLoggedInAsAdmin', 'true');
             router.push('/dashboard');
             return;

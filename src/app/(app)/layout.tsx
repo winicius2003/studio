@@ -42,7 +42,7 @@ export default function AppLayout({
         setUser({
           uid: 'admin',
           displayName: 'Admin User',
-          email: 'admin@invoiceo.lite',
+          email: 'admin@admin',
           photoURL: null,
         });
         setLoading(false);
