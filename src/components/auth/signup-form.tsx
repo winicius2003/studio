@@ -14,6 +14,11 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, updateProfile } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useToast } from '@/hooks/use-toast';
+
 
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg viewBox="0 0 48 48" {...props}>
@@ -22,14 +27,65 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 export function SignupForm() {
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+    const router = useRouter();
+    const { toast } = useToast();
 
-    const handleSignup = (e: React.FormEvent) => {
+    const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!name || !email || !password) {
+            toast({
+                variant: 'destructive',
+                title: 'Missing Fields',
+                description: 'Please fill out all fields.',
+            });
+            return;
+        }
+        if (password.length < 6) {
+            toast({
+                variant: 'destructive',
+                title: 'Invalid Password',
+                description: 'Password must be at least 6 characters long.',
+            });
+            return;
+        }
         setIsLoading(true);
-        // Simulate API call
-        setTimeout(() => setIsLoading(false), 2000);
-    }
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            await updateProfile(userCredential.user, { displayName: name });
+            router.push('/dashboard');
+        } catch (error: any) {
+             toast({
+                variant: 'destructive',
+                title: 'Sign Up Failed',
+                description: 'This email might already be in use. Please try another one.',
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    const handleGoogleSignIn = async () => {
+        setIsGoogleLoading(true);
+        const provider = new GoogleAuthProvider();
+        try {
+            await signInWithPopup(auth, provider);
+            router.push('/dashboard');
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Google Sign-Up Failed',
+                description: "Could not sign up with Google. Please try again.",
+            });
+        } finally {
+            setIsGoogleLoading(false);
+        }
+    };
+
   return (
     <Card>
       <form onSubmit={handleSignup}>
@@ -40,19 +96,19 @@ export function SignupForm() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
-            <Input id="name" type="text" placeholder="Alex Doe" required />
+            <Input id="name" type="text" placeholder="Alex Doe" required value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="m@example.com" required />
+            <Input id="email" type="email" placeholder="m@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" required />
+            <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
         </CardContent>
         <CardFooter className="flex-col gap-4">
-          <Button className="w-full" disabled={isLoading}>
+          <Button type="submit" className="w-full" disabled={isLoading || isGoogleLoading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create Account
           </Button>
@@ -61,8 +117,8 @@ export function SignupForm() {
                 <span className="text-xs text-muted-foreground">OR</span>
                 <Separator className="flex-1" />
             </div>
-            <Button variant="outline" className="w-full">
-                <GoogleIcon className="mr-2 h-4 w-4" />
+            <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isLoading || isGoogleLoading}>
+                {isGoogleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon className="mr-2 h-4 w-4" />}
                 Sign up with Google
             </Button>
         </CardFooter>

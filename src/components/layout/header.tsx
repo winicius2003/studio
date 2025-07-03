@@ -4,13 +4,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Bell,
-  Home,
-  LayoutDashboard,
   Menu,
-  Settings,
-  Users,
-  FileText
 } from 'lucide-react';
+import { FileText } from 'lucide-react';
 
 import {
   DropdownMenu,
@@ -23,7 +19,8 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { mockUser } from '@/lib/data';
+import { signOut, User as FirebaseUser } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 const MobileNav = () => (
     <Sheet>
@@ -62,28 +59,40 @@ const MobileNav = () => (
   </Sheet>
 )
 
-const UserMenu = () => {
-    const user = mockUser;
+const UserMenu = ({ user }: { user: FirebaseUser }) => {
     const router = useRouter();
 
-    const handleLogout = () => {
-      // In a real application, you would call a sign-out method here.
-      router.push('/');
+    const handleLogout = async () => {
+      try {
+        await signOut(auth);
+        router.push('/');
+      } catch (error) {
+          console.error("Logout failed", error);
+      }
     };
+
+    const getInitials = (name: string | null): string => {
+        if (!name) return "U";
+        const names = name.split(' ').filter(Boolean);
+        if (names.length > 1) {
+            return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+        }
+        return name.charAt(0).toUpperCase();
+    }
 
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="secondary" size="icon" className="rounded-full">
             <Avatar>
-              <AvatarImage src={user.avatarUrl} alt={user.name} />
-              <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+              <AvatarImage src={user.photoURL ?? undefined} alt={user.displayName ?? "User"} />
+              <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
             </Avatar>
             <span className="sr-only">Toggle user menu</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <DropdownMenuLabel>{user.displayName || user.email}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
             <Link href="/settings">Settings</Link>
@@ -96,7 +105,7 @@ const UserMenu = () => {
     );
 }
 
-export default function Header() {
+export default function Header({ user }: { user: FirebaseUser }) {
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6">
       <div className="flex w-full items-center gap-4">
@@ -108,7 +117,7 @@ export default function Header() {
             <Bell className="h-5 w-5" />
             <span className="sr-only">Notifications</span>
         </Button>
-        <UserMenu />
+        <UserMenu user={user} />
       </div>
     </header>
   );
