@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Bell,
   Home,
@@ -63,6 +64,13 @@ const MobileNav = () => (
 
 const UserMenu = () => {
     const user = mockUser;
+    const router = useRouter();
+
+    const handleLogout = () => {
+      // In a real application, you would call a sign-out method here.
+      router.push('/');
+    };
+
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -77,10 +85,12 @@ const UserMenu = () => {
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>Settings</DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/settings">Settings</Link>
+          </DropdownMenuItem>
           <DropdownMenuItem>Support</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>Logout</DropdownMenuItem>
+          <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     );
