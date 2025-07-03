@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Settings, FileText, Gem } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, FileText, Gem, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/clients', icon: Users, label: 'Clients' },
+  { href: '/products', icon: Package, label: 'Products' },
   { href: '/settings', icon: Settings, label: 'Settings' },
   { href: '/pricing', icon: Gem, label: 'Upgrade Plan' },
 ];

@@ -41,3 +41,12 @@ export type Invoice = {
   currency: 'USD' | 'EUR' | 'GBP';
   note?: string;
 };
+
+export type Product = {
+  id: string;
+  userId: string;
+  name: string;
+  description: string;
+  unitPrice: number;
+  taxRate?: number;
+};

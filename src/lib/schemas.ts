@@ -9,6 +9,14 @@ export const clientSchema = z.object({
 });
 export type ClientFormValues = z.infer<typeof clientSchema>;
 
+export const productSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters."),
+  description: z.string().optional(),
+  unitPrice: z.coerce.number().min(0, "Unit price cannot be negative."),
+  taxRate: z.coerce.number().min(0).max(100).optional(),
+});
+export type ProductFormValues = z.infer<typeof productSchema>;
+
 
 export const lineItemSchema = z.object({
   description: z.string().min(1, "Description is required."),
