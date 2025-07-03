@@ -1,20 +1,26 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, Clock, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { mockInvoices } from '@/lib/data';
+import type { Invoice } from '@/types';
 
-export default function StatsCards() {
-  const totalRevenue = mockInvoices
+interface StatsCardsProps {
+  invoices: Invoice[];
+}
+
+export default function StatsCards({ invoices }: StatsCardsProps) {
+  const totalRevenue = invoices
     .filter((invoice) => invoice.status === 'paid')
     .reduce((sum, invoice) => sum + invoice.total, 0);
 
-  const outstanding = mockInvoices
+  const outstanding = invoices
     .filter((invoice) => invoice.status === 'pending')
     .reduce((sum, invoice) => sum + invoice.total, 0);
 
-  const overdue = mockInvoices
+  const overdue = invoices
     .filter((invoice) => invoice.status === 'overdue')
     .reduce((sum, invoice) => sum + invoice.total, 0);
+  
+  const currency = invoices.length > 0 ? invoices[0].currency : 'EUR';
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -25,7 +31,7 @@ export default function StatsCards() {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {formatCurrency(totalRevenue, 'EUR', 'pt-PT')}
+            {formatCurrency(totalRevenue, currency)}
           </div>
           <p className="text-xs text-muted-foreground">
             All-time earnings from paid invoices.
@@ -39,7 +45,7 @@ export default function StatsCards() {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {formatCurrency(outstanding, 'EUR', 'pt-PT')}
+            {formatCurrency(outstanding, currency)}
           </div>
           <p className="text-xs text-muted-foreground">
             Amount pending from clients.
@@ -53,7 +59,7 @@ export default function StatsCards() {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-destructive">
-            {formatCurrency(overdue, 'EUR', 'pt-PT')}
+            {formatCurrency(overdue, currency)}
           </div>
           <p className="text-xs text-muted-foreground">
             Amount from invoices past their due date.

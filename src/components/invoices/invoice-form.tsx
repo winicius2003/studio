@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -39,31 +40,41 @@ import { useToast } from '@/hooks/use-toast';
 import { getAutofillSuggestions } from '@/app/actions';
 import InvoicePreview from './invoice-preview';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/hooks/use-auth';
-import { mockUser } from '@/lib/data';
 
 interface InvoiceFormProps {
   invoice?: Invoice;
 }
 
 export default function InvoiceForm({ invoice }: InvoiceFormProps) {
+  const router = useRouter();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
-    defaultValues: {
-      clientId: invoice?.client.id || '',
-      issueDate: invoice?.issueDate || new Date(),
-      dueDate: invoice?.dueDate || new Date(new Date().setDate(new Date().getDate() + 30)),
-      currency: invoice?.currency || 'EUR',
-      lineItems: invoice?.lineItems || [{ description: '', quantity: 1, unitPrice: 0 }],
-      note: invoice?.note || '',
-    },
+    defaultValues: invoice 
+      ? {
+          clientId: invoice.client.id,
+          issueDate: invoice.issueDate,
+          dueDate: invoice.dueDate,
+          currency: invoice.currency,
+          lineItems: invoice.lineItems,
+          note: invoice.note,
+        }
+      : {
+          clientId: '',
+          issueDate: new Date(),
+          dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+          currency: 'EUR',
+          lineItems: [{ description: '', quantity: 1, unitPrice: 0 }],
+          note: '',
+        },
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -147,13 +158,58 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     }
   };
 
-  function onSubmit(values: InvoiceFormValues) {
-    console.log(values);
-    toast({
-      title: 'Invoice Submitted!',
-      description: 'Your invoice has been successfully saved.',
-    });
-  }
+  const onSubmit = async (values: InvoiceFormValues) => {
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in.' });
+      return;
+    }
+    if (!selectedClient) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Selected client not found.' });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const invoiceData = {
+      ...values,
+      userId: user.uid,
+      client: selectedClient,
+      subtotal,
+      tax,
+      total,
+      status: 'draft' as const, // Default status for now
+      invoiceNumber: invoice?.invoiceNumber || `INV-${Date.now()}` // Generate or keep existing
+    };
+
+    try {
+      if (invoice) {
+        // Update existing invoice
+        const invoiceRef = doc(db, 'invoices', invoice.id);
+        await updateDoc(invoiceRef, invoiceData);
+        toast({ title: 'Success!', description: 'Invoice has been updated.' });
+      } else {
+        // Add new invoice
+        await addDoc(collection(db, 'invoices'), invoiceData);
+        toast({ title: 'Success!', description: 'New invoice has been created.' });
+      }
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Error saving invoice:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not save invoice.' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const previewUser: User | null = user ? {
+    id: user.uid,
+    name: user.displayName || 'Your Company',
+    email: user.email || 'your.email@company.com',
+    avatarUrl: user.photoURL || undefined,
+    plan: user.isAdmin ? 'business' : 'free',
+    language: 'en',
+    currency: 'EUR',
+  } : null;
 
   return (
     <Form {...form}>
@@ -170,20 +226,26 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                 )}
                 Autofill with AI
               </Button>
-               <Dialog>
-                <DialogTrigger asChild>
-                  <Button type="button" variant="secondary">
-                      <Eye className="mr-2 h-4 w-4" />
-                      Preview Invoice
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl">
-                   <DialogHeader>
-                    <DialogTitle>Invoice Preview</DialogTitle>
-                  </DialogHeader>
-                  <InvoicePreview formData={watchedFormData as InvoiceFormValues} client={selectedClient} user={mockUser}/>
-                </DialogContent>
-              </Dialog>
+              {previewUser && 
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button type="button" variant="secondary">
+                        <Eye className="mr-2 h-4 w-4" />
+                        Preview Invoice
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                      <DialogTitle>Invoice Preview</DialogTitle>
+                    </DialogHeader>
+                    <InvoicePreview 
+                      formData={watchedFormData as InvoiceFormValues} 
+                      client={selectedClient} 
+                      user={previewUser}
+                    />
+                  </DialogContent>
+                </Dialog>
+              }
             </div>
           </CardHeader>
           <CardContent className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -264,7 +326,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                       <FormItem className="col-span-4 md:col-span-2">
                         {index === 0 && <FormLabel>Qty</FormLabel>}
                         <FormControl>
-                          <Input type="number" placeholder="1" {...field} />
+                          <Input type="number" placeholder="1" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
                         </FormControl>
                          <FormMessage />
                       </FormItem>
@@ -277,7 +339,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                       <FormItem className="col-span-4 md:col-span-2">
                         {index === 0 && <FormLabel>Price</FormLabel>}
                         <FormControl>
-                          <Input type="number" placeholder="0.00" {...field} />
+                          <Input type="number" placeholder="0.00" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
                         </FormControl>
                          <FormMessage />
                       </FormItem>
@@ -358,7 +420,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                             <FormControl>
                             <SelectTrigger>
                                 <SelectValue placeholder="Select currency" />
-                            </SelectTrigger>
+                            </Trigger>
                             </FormControl>
                             <SelectContent>
                                 <SelectItem value="EUR">EUR (€)</SelectItem>
@@ -372,8 +434,11 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                     />
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
-                <Button type="button" variant="outline">Save as Draft</Button>
-                <Button type="submit">Save and Send</Button>
+                <Button type="button" variant="outline" onClick={() => toast({ title: 'Coming soon!', description: 'Saving as draft will be implemented soon.'})} disabled={isSubmitting}>Save as Draft</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                   {invoice ? 'Save Changes' : 'Save and Send'}
+                </Button>
             </CardFooter>
         </Card>
       </form>

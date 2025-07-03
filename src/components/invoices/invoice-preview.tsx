@@ -33,9 +33,9 @@ export default function InvoicePreview({
         {/* Header */}
         <header className="flex justify-between items-start pb-8 border-b-2 border-gray-200">
           <div>
-            <h1 className="text-4xl font-bold text-primary">INVOICE</h1>
+            <h1 className="text-4xl font-bold text-gray-800">INVOICE</h1>
             <p className="text-gray-500 mt-1">
-              Invoice #: 2024-PREVIEW
+              Invoice #: {`INV-${Date.now()}`}
             </p>
           </div>
           <div className="text-right">
@@ -48,7 +48,7 @@ export default function InvoicePreview({
         {/* Client & Dates */}
         <section className="grid grid-cols-2 gap-8 my-8">
           <div>
-            <h3 className="text-gray-500 font-semibold mb-2">BILL TO</h3>
+            <h3 className="text-gray-500 font-semibold mb-2 uppercase tracking-wider">Bill To</h3>
             {client ? (
               <>
                 <p className="font-bold">{client.name}</p>
@@ -62,11 +62,11 @@ export default function InvoicePreview({
           </div>
           <div className="text-right">
              <div className="grid grid-cols-2">
-                <p className="font-semibold">Issue Date:</p>
+                <p className="font-semibold text-gray-500">Issue Date:</p>
                 <p>{issueDate ? format(issueDate, 'PPP') : '...'}</p>
              </div>
              <div className="grid grid-cols-2 mt-2">
-                <p className="font-semibold">Due Date:</p>
+                <p className="font-semibold text-gray-500">Due Date:</p>
                 <p>{dueDate ? format(dueDate, 'PPP') : '...'}</p>
              </div>
           </div>
@@ -77,10 +77,10 @@ export default function InvoicePreview({
           <table className="w-full text-left">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="p-3 font-semibold">Description</th>
-                <th className="p-3 font-semibold text-center w-24">Quantity</th>
-                <th className="p-3 font-semibold text-right w-32">Unit Price</th>
-                <th className="p-3 font-semibold text-right w-32">Total</th>
+                <th className="p-3 font-semibold uppercase tracking-wider text-gray-600">Description</th>
+                <th className="p-3 font-semibold uppercase tracking-wider text-gray-600 text-center w-24">Quantity</th>
+                <th className="p-3 font-semibold uppercase tracking-wider text-gray-600 text-right w-32">Unit Price</th>
+                <th className="p-3 font-semibold uppercase tracking-wider text-gray-600 text-right w-32">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -91,7 +91,7 @@ export default function InvoicePreview({
                   <td className="p-3 text-right">
                     {formatCurrency(item.unitPrice || 0, currency)}
                   </td>
-                  <td className="p-3 text-right">
+                  <td className="p-3 text-right font-medium">
                     {formatCurrency(
                       (item.quantity || 0) * (item.unitPrice || 0),
                       currency
@@ -99,6 +99,11 @@ export default function InvoicePreview({
                   </td>
                 </tr>
               ))}
+               {!lineItems || lineItems.length === 0 && (
+                <tr>
+                    <td colSpan={4} className="text-center p-8 text-gray-400">No items added yet.</td>
+                </tr>
+               )}
             </tbody>
           </table>
         </section>
@@ -115,7 +120,7 @@ export default function InvoicePreview({
               <p>{formatCurrency(tax, currency)}</p>
             </div>
             <Separator />
-            <div className="flex justify-between font-bold text-lg">
+            <div className="flex justify-between font-bold text-lg text-gray-800">
               <p>Total:</p>
               <p>{formatCurrency(total, currency)}</p>
             </div>
@@ -127,7 +132,7 @@ export default function InvoicePreview({
             {note && (
                 <div>
                     <h3 className="font-semibold mb-2">Notes</h3>
-                    <p className="text-gray-600">{note}</p>
+                    <p className="text-gray-600 whitespace-pre-line">{note}</p>
                 </div>
             )}
           <p className="text-center text-gray-500 mt-8">

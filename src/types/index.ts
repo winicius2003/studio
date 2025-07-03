@@ -19,7 +19,7 @@ export type Client = {
 };
 
 export type LineItem = {
-  id: string;
+  id?: string;
   description: string;
   quantity: number;
   unitPrice: number;
@@ -29,6 +29,7 @@ export type InvoiceStatus = 'paid' | 'pending' | 'overdue' | 'draft';
 
 export type Invoice = {
   id: string;
+  userId: string;
   invoiceNumber: string;
   client: Client;
   lineItems: LineItem[];
