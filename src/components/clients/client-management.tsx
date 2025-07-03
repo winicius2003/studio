@@ -4,15 +4,14 @@
 import { useState, useEffect } from 'react';
 import {
   collection,
-  addDoc,
   deleteDoc,
   doc,
   onSnapshot,
   query,
   where,
 } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
-import { useAuthState } from 'react-firebase-hooks/auth';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/hooks/use-auth';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -21,7 +20,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Table,
@@ -56,7 +54,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Client } from '@/types';
 
 export default function ClientManagement() {
-  const [user, authLoading] = useAuthState(auth);
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,6 +62,13 @@ export default function ClientManagement() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
   useEffect(() => {
+    // Wait until the auth state is determined
+    if (authLoading) {
+      setIsLoading(true);
+      return;
+    }
+
+    // If there's a user, fetch their clients
     if (user) {
       const q = query(collection(db, 'clients'), where('userId', '==', user.uid));
       const unsubscribe = onSnapshot(
@@ -74,7 +79,7 @@ export default function ClientManagement() {
             clientsData.push({ id: doc.id, ...doc.data() } as Client);
           });
           setClients(clientsData);
-          setIsLoading(false);
+          setIsLoading(false); // Data is loaded or is empty
         },
         (error) => {
           console.error('Error fetching clients:', error);
@@ -86,8 +91,11 @@ export default function ClientManagement() {
           setIsLoading(false);
         }
       );
+      // Cleanup subscription on unmount
       return () => unsubscribe();
-    } else if (!authLoading) {
+    } else {
+      // No user is logged in, so there are no clients to show
+      setClients([]);
       setIsLoading(false);
     }
   }, [user, authLoading, toast]);

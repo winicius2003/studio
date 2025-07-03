@@ -38,9 +38,9 @@ import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { getAutofillSuggestions } from '@/app/actions';
 import InvoicePreview from './invoice-preview';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { useAuthState } from 'react-firebase-hooks/auth';
+import { useAuth } from '@/hooks/use-auth';
 import { mockUser } from '@/lib/data';
 
 interface InvoiceFormProps {
@@ -49,7 +49,7 @@ interface InvoiceFormProps {
 
 export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const { toast } = useToast();
-  const [user, authLoading] = useAuthState(auth);
+  const { user, loading: authLoading } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -82,6 +82,10 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const total = subtotal + tax;
 
   useEffect(() => {
+    if (authLoading) {
+      setClientsLoading(true);
+      return;
+    }
     if (user) {
       const q = query(collection(db, 'clients'), where('userId', '==', user.uid));
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -93,7 +97,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
         setClientsLoading(false);
       });
       return () => unsubscribe();
-    } else if (!authLoading) {
+    } else {
+      setClients([]);
       setClientsLoading(false);
     }
   }, [user, authLoading]);
@@ -108,12 +113,20 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
       });
       return;
     }
+    if (!user) {
+      toast({
+        variant: 'destructive',
+        title: 'Not Logged In',
+        description: 'You must be logged in to use this feature.',
+      });
+      return;
+    }
 
     setIsAiLoading(true);
     const result = await getAutofillSuggestions({
       clientId,
       currency,
-      userId: user?.uid || 'mock-user-id',
+      userId: user.uid,
       invoiceItems: [],
     });
     setIsAiLoading(false);

@@ -4,9 +4,9 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { clientSchema, type ClientFormValues } from '@/lib/schemas';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
-import { useAuthState } from 'react-firebase-hooks/auth';
+import { useAuth } from '@/hooks/use-auth';
 
 import {
   Form,
@@ -28,7 +28,7 @@ interface ClientFormProps {
 }
 
 export default function ClientForm({ client, onSuccess }: ClientFormProps) {
-  const [user] = useAuthState(auth);
+  const { user } = useAuth();
   const { toast } = useToast();
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
