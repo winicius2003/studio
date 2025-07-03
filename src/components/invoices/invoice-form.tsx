@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -52,7 +53,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
-  const [clientsLoading, setClientsLoading] = useState(true);
+  const [isLoadingClients, setIsLoadingClients] = useState(true);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -93,83 +94,62 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const total = subtotal + tax;
 
   useEffect(() => {
-    if (authLoading) {
-      setClientsLoading(true);
-      return;
-    }
+    if (authLoading) return;
     if (user) {
       const q = query(collection(db, 'clients'), where('userId', '==', user.uid));
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const clientsData: Client[] = [];
-        querySnapshot.forEach((doc) => {
-          clientsData.push({ id: doc.id, ...doc.data() } as Client);
-        });
+        const clientsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
         setClients(clientsData);
-        setClientsLoading(false);
+        setIsLoadingClients(false);
+      }, (error) => {
+        console.error("Failed to fetch clients:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not fetch clients." });
+        setIsLoadingClients(false);
       });
       return () => unsubscribe();
     } else {
       setClients([]);
-      setClientsLoading(false);
+      setIsLoadingClients(false);
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, toast]);
 
   const handleAutofill = async () => {
-    const { clientId, currency } = form.getValues();
-    if (!clientId) {
-      toast({
-        variant: 'destructive',
-        title: 'Client Required',
-        description: 'Please select a client before using AI autofill.',
-      });
+    if (!user || !form.getValues('clientId')) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please select a client first.' });
       return;
     }
-    if (!user) {
-      toast({
-        variant: 'destructive',
-        title: 'Not Logged In',
-        description: 'You must be logged in to use this feature.',
-      });
-      return;
-    }
-
+    
     setIsAiLoading(true);
-    const result = await getAutofillSuggestions({
-      clientId,
-      currency,
-      userId: user.uid,
-      invoiceItems: [],
-    });
-    setIsAiLoading(false);
+    try {
+      const result = await getAutofillSuggestions({
+        clientId: form.getValues('clientId'),
+        currency: form.getValues('currency'),
+        userId: user.uid,
+        invoiceItems: form.getValues('lineItems'),
+      });
 
-    if (result.success && result.data) {
-      form.setValue('lineItems', result.data.suggestedItems);
-      form.setValue('note', result.data.suggestedNote);
-      toast({
-        title: 'AI Autofill Successful',
-        description: 'Invoice details have been pre-filled.',
-      });
-    } else {
-      toast({
-        variant: 'destructive',
-        title: 'AI Autofill Failed',
-        description: result.error,
-      });
+      if (result.success && result.data) {
+        form.setValue('lineItems', result.data.suggestedItems);
+        form.setValue('note', result.data.suggestedNote);
+        toast({ title: 'Success', description: 'AI suggestions applied.' });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'AI Error', description: 'Failed to get AI suggestions.' });
+    } finally {
+      setIsAiLoading(false);
     }
   };
 
   const onSubmit = async (values: InvoiceFormValues) => {
-    if (!user) {
-      toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in.' });
-      return;
-    }
-    if (!selectedClient) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Selected client not found.' });
+    if (!user || !selectedClient) {
+      toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in and select a client.' });
       return;
     }
 
     setIsSubmitting(true);
-
+    
     const invoiceData = {
       ...values,
       userId: user.uid,
@@ -177,25 +157,23 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
       subtotal,
       tax,
       total,
-      status: 'draft' as const, // Default status for now
-      invoiceNumber: invoice?.invoiceNumber || `INV-${Date.now()}` // Generate or keep existing
+      status: 'draft' as const,
+      invoiceNumber: invoice?.invoiceNumber || `INV-${Date.now()}`,
     };
 
     try {
       if (invoice) {
-        // Update existing invoice
         const invoiceRef = doc(db, 'invoices', invoice.id);
         await updateDoc(invoiceRef, invoiceData);
         toast({ title: 'Success!', description: 'Invoice has been updated.' });
       } else {
-        // Add new invoice
         await addDoc(collection(db, 'invoices'), invoiceData);
         toast({ title: 'Success!', description: 'New invoice has been created.' });
       }
       router.push('/dashboard');
     } catch (error) {
       console.error('Error saving invoice:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not save invoice.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not save the invoice.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -218,26 +196,20 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
             <CardTitle>Invoice Details</CardTitle>
             <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={handleAutofill} disabled={isAiLoading}>
-                {isAiLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="mr-2 h-4 w-4" />
-                )}
+              <Button type="button" variant="outline" onClick={handleAutofill} disabled={isAiLoading || isSubmitting}>
+                {isAiLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                 Autofill with AI
               </Button>
-              {previewUser && 
+              {previewUser && (
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button type="button" variant="secondary">
-                        <Eye className="mr-2 h-4 w-4" />
-                        Preview Invoice
+                      <Eye className="mr-2 h-4 w-4" />
+                      Preview Invoice
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-4xl">
-                    <DialogHeader>
-                      <DialogTitle>Invoice Preview</DialogTitle>
-                    </DialogHeader>
+                    <DialogHeader><DialogTitle>Invoice Preview</DialogTitle></DialogHeader>
                     <InvoicePreview 
                       formData={watchedFormData as InvoiceFormValues} 
                       client={selectedClient} 
@@ -245,7 +217,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                     />
                   </DialogContent>
                 </Dialog>
-              }
+              )}
             </div>
           </CardHeader>
           <CardContent className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -255,18 +227,14 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Client</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={clientsLoading}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingClients}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={clientsLoading ? "Loading clients..." : "Select a client"} />
+                        <SelectValue placeholder={isLoadingClients ? "Loading..." : "Select a client"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
+                      {clients.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -277,31 +245,21 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
               control={form.control}
               name="issueDate"
               render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Issue Date</FormLabel>
-                  <DatePicker field={field} />
-                  <FormMessage />
-                </FormItem>
+                <FormItem className="flex flex-col"><FormLabel>Issue Date</FormLabel><DatePicker field={field} /><FormMessage /></FormItem>
               )}
             />
             <FormField
               control={form.control}
               name="dueDate"
               render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Due Date</FormLabel>
-                  <DatePicker field={field} />
-                  <FormMessage />
-                </FormItem>
+                <FormItem className="flex flex-col"><FormLabel>Due Date</FormLabel><DatePicker field={field} /><FormMessage /></FormItem>
               )}
             />
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Line Items</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>Line Items</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-4">
               {fields.map((field, index) => (
@@ -312,9 +270,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                     render={({ field }) => (
                       <FormItem className="col-span-12 md:col-span-6">
                         {index === 0 && <FormLabel>Description</FormLabel>}
-                        <FormControl>
-                          <Input placeholder="Item description" {...field} />
-                        </FormControl>
+                        <FormControl><Input placeholder="Item description" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -325,10 +281,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                     render={({ field }) => (
                       <FormItem className="col-span-4 md:col-span-2">
                         {index === 0 && <FormLabel>Qty</FormLabel>}
-                        <FormControl>
-                          <Input type="number" placeholder="1" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                        </FormControl>
-                         <FormMessage />
+                        <FormControl><Input type="number" placeholder="1" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -338,27 +292,20 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                     render={({ field }) => (
                       <FormItem className="col-span-4 md:col-span-2">
                         {index === 0 && <FormLabel>Price</FormLabel>}
-                        <FormControl>
-                          <Input type="number" placeholder="0.00" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                        </FormControl>
-                         <FormMessage />
+                        <FormControl><Input type="number" placeholder="0.00" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
-                   <div className="col-span-3 md:col-span-1 flex items-end h-full">
-                     {index === 0 && <FormLabel className="hidden md:block">&nbsp;</FormLabel>}
-                     <p className="w-full text-right pt-2 font-medium">
-                       {formatCurrency((form.watch(`lineItems.${index}.quantity`) || 0) * (form.watch(`lineItems.${index}.unitPrice`) || 0), currency)}
-                     </p>
-                   </div>
+                  <div className="col-span-3 md:col-span-1 flex items-end h-full">
+                    {index === 0 && <FormLabel className="hidden md:block">&nbsp;</FormLabel>}
+                    <p className="w-full text-right pt-2 font-medium">
+                      {formatCurrency((form.watch(`lineItems.${index}.quantity`) || 0) * (form.watch(`lineItems.${index}.unitPrice`) || 0), currency)}
+                    </p>
+                  </div>
                   <div className="col-span-1 flex items-end h-full">
                     {index > 0 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => remove(index)}
-                      >
+                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     )}
@@ -366,80 +313,60 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                 </div>
               ))}
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="mt-4"
-              onClick={() => append({ description: '', quantity: 1, unitPrice: 0 })}
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Item
+            <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => append({ description: '', quantity: 1, unitPrice: 0 })}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Item
             </Button>
             <Separator className="my-6" />
             <div className="grid grid-cols-2 gap-4 md:w-1/2 ml-auto">
-                <p>Subtotal</p>
-                <p className="text-right font-medium">{formatCurrency(subtotal, currency)}</p>
-                <p>Tax (23%)</p>
-                <p className="text-right font-medium">{formatCurrency(tax, currency)}</p>
-                <p className="font-bold">Total</p>
-                <p className="text-right font-bold">{formatCurrency(total, currency)}</p>
+              <p>Subtotal</p><p className="text-right font-medium">{formatCurrency(subtotal, currency)}</p>
+              <p>Tax (23%)</p><p className="text-right font-medium">{formatCurrency(tax, currency)}</p>
+              <p className="font-bold">Total</p><p className="text-right font-bold">{formatCurrency(total, currency)}</p>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-            <CardHeader>
-                <CardTitle>Additional Details</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-6 md:grid-cols-2">
-                 <FormField
-                    control={form.control}
-                    name="note"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Note</FormLabel>
-                        <FormControl>
-                            <Textarea
-                            placeholder="Add a note for your client..."
-                            className="resize-none"
-                            {...field}
-                            />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="currency"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Currency</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select currency" />
-                            </Trigger>
-                            </FormControl>
-                            <SelectContent>
-                                <SelectItem value="EUR">EUR (€)</SelectItem>
-                                <SelectItem value="USD">USD ($)</SelectItem>
-                                <SelectItem value="GBP">GBP (£)</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-            </CardContent>
-            <CardFooter className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => toast({ title: 'Coming soon!', description: 'Saving as draft will be implemented soon.'})} disabled={isSubmitting}>Save as Draft</Button>
-                <Button type="submit" disabled={isSubmitting}>
-                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                   {invoice ? 'Save Changes' : 'Save and Send'}
-                </Button>
-            </CardFooter>
+          <CardHeader><CardTitle>Additional Details</CardTitle></CardHeader>
+          <CardContent className="grid gap-6 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="note"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Note</FormLabel>
+                  <FormControl><Textarea placeholder="Add a note for your client..." className="resize-none" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="currency"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Currency</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select currency" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="EUR">EUR (€)</SelectItem>
+                      <SelectItem value="USD">USD ($)</SelectItem>
+                      <SelectItem value="GBP">GBP (£)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+          <CardFooter className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => toast({ title: 'Coming soon!', description: 'Saving as draft will be implemented soon.' })} disabled={isSubmitting}>
+              Save as Draft
+            </Button>
+            <Button type="submit" disabled={isSubmitting || isAiLoading}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {invoice ? 'Save Changes' : 'Save and Send'}
+            </Button>
+          </CardFooter>
         </Card>
       </form>
     </Form>
