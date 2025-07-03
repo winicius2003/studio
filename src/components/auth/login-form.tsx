@@ -49,10 +49,14 @@ export function LoginForm() {
             await signInWithEmailAndPassword(auth, email, password);
             router.push('/dashboard');
         } catch (error: any) {
+            let description = "An unexpected error occurred. Please try again.";
+            if (error.code === 'auth/invalid-credential') {
+                description = "Invalid email or password. Please check your credentials and try again.";
+            }
             toast({
                 variant: 'destructive',
                 title: 'Login Failed',
-                description: "Please check your credentials and try again.",
+                description: description,
             });
         } finally {
             setIsLoading(false);
@@ -69,7 +73,7 @@ export function LoginForm() {
             toast({
                 variant: 'destructive',
                 title: 'Google Sign-In Failed',
-                description: "Could not sign in with Google. Please try again.",
+                description: "Could not sign in with Google. Check Firebase configuration and try again.",
             });
         } finally {
             setIsGoogleLoading(false);

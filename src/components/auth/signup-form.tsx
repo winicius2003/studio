@@ -45,24 +45,22 @@ export function SignupForm() {
             });
             return;
         }
-        if (password.length < 6) {
-            toast({
-                variant: 'destructive',
-                title: 'Invalid Password',
-                description: 'Password must be at least 6 characters long.',
-            });
-            return;
-        }
         setIsLoading(true);
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await updateProfile(userCredential.user, { displayName: name });
             router.push('/dashboard');
         } catch (error: any) {
+            let description = "An unexpected error occurred. Please try again.";
+            if (error.code === 'auth/email-already-in-use') {
+                description = "This email is already in use. Try logging in instead.";
+            } else if (error.code === 'auth/weak-password') {
+                description = "The password is too weak. It must be at least 6 characters long.";
+            }
              toast({
                 variant: 'destructive',
                 title: 'Sign Up Failed',
-                description: 'This email might already be in use. Please try another one.',
+                description: description,
             });
         } finally {
             setIsLoading(false);
@@ -79,7 +77,7 @@ export function SignupForm() {
             toast({
                 variant: 'destructive',
                 title: 'Google Sign-Up Failed',
-                description: "Could not sign up with Google. Please try again.",
+                description: "Could not sign up with Google. Check Firebase configuration and try again.",
             });
         } finally {
             setIsGoogleLoading(false);
