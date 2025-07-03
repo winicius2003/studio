@@ -8,23 +8,48 @@ import Header from '@/components/layout/header';
 import Sidebar from '@/components/layout/sidebar';
 import { Loader2 } from 'lucide-react';
 
+// Define a simpler user type for the header to accommodate both Firebase users and the mock admin
+export type DisplayUser = {
+  uid: string;
+  displayName: string | null;
+  email: string | null;
+  photoURL: string | null;
+};
+
 export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<DisplayUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
-        router.push('/login');
+      const isAdminSession = sessionStorage.getItem('isLoggedInAsAdmin') === 'true';
+
+      if (currentUser) {
+        setUser({
+          uid: currentUser.uid,
+          displayName: currentUser.displayName,
+          email: currentUser.email,
+          photoURL: currentUser.photoURL,
+        });
+        setLoading(false);
+      } else if (isAdminSession) {
+        // If there's no Firebase user but an admin session exists, create a mock user
+        setUser({
+          uid: 'admin',
+          displayName: 'Admin User',
+          email: 'admin@invoiceo.lite',
+          photoURL: null,
+        });
+        setLoading(false);
       } else {
-        setUser(currentUser);
+        // If no user and no admin session, redirect to login
+        router.push('/login');
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -39,6 +64,7 @@ export default function AppLayout({
   }
 
   if (!user) {
+    // This prevents rendering the layout without a valid user or admin session
     return null;
   }
   

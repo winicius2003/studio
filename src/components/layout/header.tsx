@@ -19,8 +19,9 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { signOut, User as FirebaseUser } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import type { DisplayUser } from '@/app/(app)/layout';
 
 const MobileNav = () => (
     <Sheet>
@@ -59,15 +60,20 @@ const MobileNav = () => (
   </Sheet>
 )
 
-const UserMenu = ({ user }: { user: FirebaseUser }) => {
+const UserMenu = ({ user }: { user: DisplayUser }) => {
     const router = useRouter();
 
     const handleLogout = async () => {
-      try {
-        await signOut(auth);
+      if (user.uid === 'admin') {
+        sessionStorage.removeItem('isLoggedInAsAdmin');
         router.push('/');
-      } catch (error) {
-          console.error("Logout failed", error);
+      } else {
+        try {
+          await signOut(auth);
+          router.push('/');
+        } catch (error) {
+            console.error("Logout failed", error);
+        }
       }
     };
 
@@ -105,7 +111,7 @@ const UserMenu = ({ user }: { user: FirebaseUser }) => {
     );
 }
 
-export default function Header({ user }: { user: FirebaseUser }) {
+export default function Header({ user }: { user: DisplayUser }) {
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6">
       <div className="flex w-full items-center gap-4">
