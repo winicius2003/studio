@@ -1,5 +1,4 @@
 import InvoiceForm from '@/components/invoices/invoice-form';
-import { mockClients } from '@/lib/data';
 
 export default function NewInvoicePage() {
   return (
@@ -10,7 +9,7 @@ export default function NewInvoicePage() {
           Fill out the form below to create a new invoice.
         </p>
       </div>
-      <InvoiceForm clients={mockClients} />
+      <InvoiceForm />
     </div>
   );
 }

@@ -10,9 +10,12 @@ export type User = {
 
 export type Client = {
   id: string;
+  userId: string;
   name: string;
   email: string;
+  address: string;
   country: string;
+  vatId?: string;
 };
 
 export type LineItem = {

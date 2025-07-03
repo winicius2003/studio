@@ -1,14 +1,15 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import ClientManagement from '@/components/clients/client-management';
 
 export default function ClientsPage() {
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
-      <Card className="flex items-center justify-center min-h-[400px]">
-          <CardHeader>
-              <CardTitle className="text-center text-muted-foreground">Client management coming soon!</CardTitle>
-          </CardHeader>
-      </Card>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
+        <p className="text-muted-foreground">
+          Manage your clients and their information here.
+        </p>
+      </div>
+      <ClientManagement />
     </div>
   );
 }

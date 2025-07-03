@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
 import StatsCards from '@/components/dashboard/stats-cards';
 import InvoicesTable from '@/components/dashboard/invoices-table';
-import { mockInvoices, mockClients, mockUser } from '@/lib/data';
+import { mockInvoices, mockUser } from '@/lib/data';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,7 +64,6 @@ export default function Dashboard() {
         <InvoicesTable
           title="Recent Invoices"
           invoices={mockInvoices}
-          clients={mockClients}
         />
       </div>
 

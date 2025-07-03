@@ -1,4 +1,4 @@
-import type { User, Client, Invoice, InvoiceStatus } from '@/types';
+import type { User, Invoice, InvoiceStatus, Client } from '@/types';
 
 export const mockUser: User = {
   id: 'user-1',
@@ -10,13 +10,7 @@ export const mockUser: User = {
   currency: 'EUR',
 };
 
-export const mockClients: Client[] = [
-  { id: 'client-1', name: 'Tech Solutions Ltd.', email: 'contact@techsolutions.com', country: 'Ireland' },
-  { id: 'client-2', name: 'Creative Agency SL', email: 'hola@creative.es', country: 'Spain' },
-  { id: 'client-3', name: 'Inovação & Cia', email: 'contato@inovacao.pt', country: 'Portugal' },
-];
-
-const createMockInvoice = (id: number, client: Client, status: InvoiceStatus, daysOffset: number, dueDays: number): Invoice => {
+const createMockInvoice = (id: number, client: Omit<Client, 'id' | 'userId'>, status: InvoiceStatus, daysOffset: number, dueDays: number): Invoice => {
   const issueDate = new Date();
   issueDate.setDate(issueDate.getDate() - daysOffset);
   const dueDate = new Date(issueDate);
@@ -34,7 +28,11 @@ const createMockInvoice = (id: number, client: Client, status: InvoiceStatus, da
   return {
     id: `inv-${id}`,
     invoiceNumber: `2024-${String(id).padStart(4, '0')}`,
-    client,
+    client: {
+      id: `client-mock-${id}`,
+      userId: 'mock-user-id',
+      ...client
+    },
     lineItems,
     status,
     issueDate,
@@ -47,10 +45,16 @@ const createMockInvoice = (id: number, client: Client, status: InvoiceStatus, da
   };
 };
 
+const mockClientsData: Omit<Client, 'id' | 'userId'>[] = [
+    { name: 'Tech Solutions Ltd.', email: 'contact@techsolutions.com', country: 'Ireland', address: '123 Tech Road, Dublin', vatId: 'IE6388047V' },
+    { name: 'Creative Agency SL', email: 'hola@creative.es', country: 'Spain', address: 'Calle de la Innovación 45, Madrid', vatId: 'ESB87654321' },
+    { name: 'Inovação & Cia', email: 'contato@inovacao.pt', country: 'Portugal', address: 'Avenida da Liberdade 100, Lisboa', vatId: 'PT509876543' },
+];
+
 export const mockInvoices: Invoice[] = [
-  createMockInvoice(1, mockClients[0], 'paid', 45, 30),
-  createMockInvoice(2, mockClients[1], 'pending', 20, 30),
-  createMockInvoice(3, mockClients[2], 'overdue', 40, 30),
-  createMockInvoice(4, mockClients[0], 'pending', 10, 30),
-  createMockInvoice(5, mockClients[1], 'draft', 2, 30),
+  createMockInvoice(1, mockClientsData[0], 'paid', 45, 30),
+  createMockInvoice(2, mockClientsData[1], 'pending', 20, 30),
+  createMockInvoice(3, mockClientsData[2], 'overdue', 40, 30),
+  createMockInvoice(4, mockClientsData[0], 'pending', 10, 30),
+  createMockInvoice(5, mockClientsData[1], 'draft', 2, 30),
 ];

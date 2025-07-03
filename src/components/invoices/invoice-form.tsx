@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useState, useEffect } from 'react';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Form,
@@ -18,28 +18,42 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Separator } from '@/components/ui/separator';
-import { Trash2, PlusCircle, Sparkles, Loader2 } from 'lucide-react';
+import { Trash2, PlusCircle, Sparkles, Loader2, Eye } from 'lucide-react';
 import { invoiceSchema, type InvoiceFormValues } from '@/lib/schemas';
-import type { Client, Invoice } from '@/types';
+import type { Client, Invoice, User } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { getAutofillSuggestions } from '@/app/actions';
+import InvoicePreview from './invoice-preview';
+import { db, auth } from '@/lib/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { mockUser } from '@/lib/data';
 
 interface InvoiceFormProps {
-  clients: Client[];
   invoice?: Invoice;
 }
 
-export default function InvoiceForm({ clients, invoice }: InvoiceFormProps) {
+export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const { toast } = useToast();
+  const [user, authLoading] = useAuthState(auth);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(true);
   const [isAiLoading, setIsAiLoading] = useState(false);
-  
+
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
@@ -57,11 +71,32 @@ export default function InvoiceForm({ clients, invoice }: InvoiceFormProps) {
     name: 'lineItems',
   });
   
-  const lineItems = form.watch('lineItems');
+  const watchedFormData = useWatch({ control: form.control });
+  const selectedClientId = form.watch('clientId');
+  const selectedClient = clients.find(c => c.id === selectedClientId) || null;
+
   const currency = form.watch('currency');
+  const lineItems = form.watch('lineItems');
   const subtotal = lineItems.reduce((acc, item) => acc + (item.quantity || 0) * (item.unitPrice || 0), 0);
   const tax = subtotal * 0.23; // Example tax rate
   const total = subtotal + tax;
+
+  useEffect(() => {
+    if (user) {
+      const q = query(collection(db, 'clients'), where('userId', '==', user.uid));
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const clientsData: Client[] = [];
+        querySnapshot.forEach((doc) => {
+          clientsData.push({ id: doc.id, ...doc.data() } as Client);
+        });
+        setClients(clientsData);
+        setClientsLoading(false);
+      });
+      return () => unsubscribe();
+    } else if (!authLoading) {
+      setClientsLoading(false);
+    }
+  }, [user, authLoading]);
 
   const handleAutofill = async () => {
     const { clientId, currency } = form.getValues();
@@ -78,7 +113,7 @@ export default function InvoiceForm({ clients, invoice }: InvoiceFormProps) {
     const result = await getAutofillSuggestions({
       clientId,
       currency,
-      userId: 'mock-user-id', // In a real app, this would come from the session
+      userId: user?.uid || 'mock-user-id',
       invoiceItems: [],
     });
     setIsAiLoading(false);
@@ -111,16 +146,32 @@ export default function InvoiceForm({ clients, invoice }: InvoiceFormProps) {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
             <CardTitle>Invoice Details</CardTitle>
-             <Button type="button" onClick={handleAutofill} disabled={isAiLoading}>
-              {isAiLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="mr-2 h-4 w-4" />
-              )}
-              Autofill with AI
-            </Button>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={handleAutofill} disabled={isAiLoading}>
+                {isAiLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-4 w-4" />
+                )}
+                Autofill with AI
+              </Button>
+               <Dialog>
+                <DialogTrigger asChild>
+                  <Button type="button" variant="secondary">
+                      <Eye className="mr-2 h-4 w-4" />
+                      Preview Invoice
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl">
+                   <DialogHeader>
+                    <DialogTitle>Invoice Preview</DialogTitle>
+                  </DialogHeader>
+                  <InvoicePreview formData={watchedFormData as InvoiceFormValues} client={selectedClient} user={mockUser}/>
+                </DialogContent>
+              </Dialog>
+            </div>
           </CardHeader>
           <CardContent className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <FormField
@@ -129,10 +180,10 @@ export default function InvoiceForm({ clients, invoice }: InvoiceFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Client</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={clientsLoading}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a client" />
+                        <SelectValue placeholder={clientsLoading ? "Loading clients..." : "Select a client"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>

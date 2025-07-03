@@ -26,7 +26,6 @@ import Link from 'next/link';
 interface InvoicesTableProps {
   title: string;
   invoices: Invoice[];
-  clients: Client[];
 }
 
 const statusVariant: { [key in InvoiceStatus]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
@@ -43,7 +42,7 @@ const statusColor: { [key in InvoiceStatus]: string } = {
     draft: 'bg-gray-500',
 }
 
-export default function InvoicesTable({ title, invoices, clients }: InvoicesTableProps) {
+export default function InvoicesTable({ title, invoices }: InvoicesTableProps) {
   return (
     <Card>
         <CardHeader>

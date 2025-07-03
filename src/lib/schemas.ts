@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+export const clientSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters."),
+  email: z.string().email("Invalid email address."),
+  address: z.string().min(10, "Please enter a full address."),
+  country: z.string().min(2, "Country is required."),
+  vatId: z.string().optional(),
+});
+export type ClientFormValues = z.infer<typeof clientSchema>;
+
+
 export const lineItemSchema = z.object({
   description: z.string().min(1, "Description is required."),
   quantity: z.coerce.number().min(0.01, "Quantity must be greater than 0."),

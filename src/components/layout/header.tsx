@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Bell,
   Menu,
+  Gem
 } from 'lucide-react';
 import { FileText } from 'lucide-react';
 
@@ -22,6 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import type { DisplayUser } from '@/app/(app)/layout';
+import { cn } from '@/lib/utils';
 
 const MobileNav = () => (
     <Sheet>
@@ -62,9 +64,10 @@ const MobileNav = () => (
 
 const UserMenu = ({ user }: { user: DisplayUser }) => {
     const router = useRouter();
+    const isAdmin = user.uid === 'admin';
 
     const handleLogout = async () => {
-      if (user.uid === 'admin') {
+      if (isAdmin) {
         sessionStorage.removeItem('isLoggedInAsAdmin');
         router.push('/');
       } else {
@@ -89,7 +92,12 @@ const UserMenu = ({ user }: { user: DisplayUser }) => {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="secondary" size="icon" className="rounded-full">
+          <Button variant="secondary" size="icon" className="rounded-full relative">
+             {isAdmin && (
+                <div className="absolute -top-1 -right-1 bg-primary p-0.5 rounded-full">
+                    <Gem className="h-3 w-3 text-primary-foreground" />
+                </div>
+            )}
             <Avatar>
               <AvatarImage src={user.photoURL ?? undefined} alt={user.displayName ?? "User"} />
               <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>

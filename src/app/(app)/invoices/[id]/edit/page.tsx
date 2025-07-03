@@ -1,5 +1,5 @@
 import InvoiceForm from '@/components/invoices/invoice-form';
-import { mockClients, mockInvoices } from '@/lib/data';
+import { mockInvoices } from '@/lib/data';
 import { notFound } from 'next/navigation';
 
 export default function EditInvoicePage({ params }: { params: { id: string } }) {
@@ -17,7 +17,7 @@ export default function EditInvoicePage({ params }: { params: { id: string } }) 
           Update the details for your invoice below.
         </p>
       </div>
-      <InvoiceForm clients={mockClients} invoice={invoice} />
+      <InvoiceForm invoice={invoice} />
     </div>
   );
 }
