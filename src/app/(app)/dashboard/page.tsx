@@ -25,7 +25,16 @@ export default function Dashboard() {
 
   const handleNewInvoiceClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    // In a real app, this data would be fetched for the current user.
+    
+    const isAdminSession = typeof window !== 'undefined' && sessionStorage.getItem('isLoggedInAsAdmin') === 'true';
+
+    // Admin has unlimited access
+    if (isAdminSession) {
+      router.push('/invoices/new');
+      return;
+    }
+
+    // For regular users, check plan limits
     const isFreePlan = mockUser.plan === 'free';
     const invoiceLimitReached = mockInvoices.length >= 3;
 
@@ -71,7 +80,7 @@ export default function Dashboard() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction asChild>
-              <Link href="/">Upgrade Plan</Link>
+              <Link href="/pricing">Upgrade Plan</Link>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
